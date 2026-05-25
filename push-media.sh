@@ -105,7 +105,10 @@ provider_for() {
 }
 
 # ── Push ──────────────────────────────────────────────────────────────────────
-REMOTE_DIR="/sdcard/Pictures/UnifiedPanel"
+# DCIM plutôt que Pictures : tous les pickers Android (YouTube, WhatsApp,
+# Instagram, …) reconnaissent DCIM comme "photos prises avec le téléphone".
+# Pictures/* est parfois filtré par les apps qui font de la "photo de profil".
+REMOTE_DIR="/sdcard/DCIM/UnifiedPanel"
 echo "→ ${#FILES[@]} fichier(s) vers ${#DEVICES[@]} téléphone(s) dans $REMOTE_DIR"
 echo ""
 
