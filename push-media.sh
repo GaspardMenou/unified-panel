@@ -105,11 +105,14 @@ provider_for() {
 }
 
 # ── Push ──────────────────────────────────────────────────────────────────────
-# DCIM plutôt que Pictures : tous les pickers Android (YouTube, WhatsApp,
-# Instagram, …) reconnaissent DCIM comme "photos prises avec le téléphone".
-# Pictures/* est parfois filtré par les apps qui font de la "photo de profil".
-REMOTE_DIR="/sdcard/DCIM/UnifiedPanel"
-echo "→ ${#FILES[@]} fichier(s) vers ${#DEVICES[@]} téléphone(s) dans $REMOTE_DIR"
+# `/sdcard/DCIM/` racine (pas un sous-dossier) : pattern utilisé par le worker
+# yt-panel pour ses clips (qui pousse dans /sdcard/Movies/ racine et ça marche
+# avec tous les pickers YouTube). Les sous-dossiers DCIM/* sont parfois ignorés
+# par les pickers stricts (photo de profil notamment). Les fichiers sont
+# préfixés `up_` pour pouvoir être nettoyés facilement.
+REMOTE_DIR="/sdcard/DCIM"
+FILENAME_PREFIX="up_"
+echo "→ ${#FILES[@]} fichier(s) vers ${#DEVICES[@]} téléphone(s) dans $REMOTE_DIR/${FILENAME_PREFIX}*"
 echo ""
 
 for serial in "${DEVICES[@]}"; do
@@ -124,7 +127,11 @@ for serial in "${DEVICES[@]}"; do
 
     for file in "${FILES[@]}"; do
         filename=$(basename "$file")
-        remote_path="$REMOTE_DIR/$filename"
+        # Sanitize : remplace les espaces et caractères louches dans le nom
+        # distant (le picker Android n'aime pas les espaces dans certains paths).
+        safe_name="${filename// /_}"
+        remote_name="${FILENAME_PREFIX}${safe_name}"
+        remote_path="$REMOTE_DIR/$remote_name"
         mime=$(mime_for "$filename")
         provider=$(provider_for "$mime")
         printf "   ↳ %s " "$filename"
@@ -145,7 +152,7 @@ for serial in "${DEVICES[@]}"; do
             --uri $provider \
             --bind _data:s:$remote_path \
             --bind mime_type:s:$mime \
-            --bind _display_name:s:$filename" >/dev/null 2>&1 || true
+            --bind _display_name:s:$remote_name" >/dev/null 2>&1 || true
 
         # 3. Fallback legacy : broadcast classique (pré-Android 10).
         #    Ignoré silencieusement sur Android moderne, mais utile si SDK < 29.
@@ -160,8 +167,10 @@ done
 
 echo -e "${GREEN}✅ Terminé.${RESET}"
 echo ""
-echo "Vérifie sur le téléphone : ouvre l'app Galerie/Photos → tu devrais voir"
-echo "l'album 'UnifiedPanel'. Si l'album n'apparaît pas tout de suite, attends"
-echo "10-20 secondes (le MediaScanner peut être en cooldown), ou redémarre"
-echo "l'app Galerie. Pour forcer un rescan complet du téléphone :"
-echo "  adb -s <serial> shell content call --method scan_volume --uri content://media --extra volume:s:external"
+echo "Les fichiers sont dans /sdcard/DCIM/ (racine — comme les clips du yt-panel"
+echo "dans /sdcard/Movies/). Visibles directement dans tous les pickers Android,"
+echo "y compris celui de l'app YouTube pour 'Modifier photo de profil'."
+echo ""
+echo "Pour nettoyer ces fichiers plus tard :"
+echo "  adb -s $TARGET_SERIAL shell rm -f /sdcard/DCIM/up_*"
+echo "  adb -s $TARGET_SERIAL shell content delete --uri content://media/external/images/media --where \"_data LIKE '%up_%'\""
