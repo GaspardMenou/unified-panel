@@ -160,18 +160,46 @@ Le toggle existe en plusieurs exemplaires (un dans le header de chaque page, mir
 
 ---
 
-## Déploiement Mac mini (prod)
+## Orchestration de la stack — 1 session tmux pour les 5 services
 
-Les 2 panels source y tournent déjà (`:3000` et `:3010`). Pas de migration de données.
+Depuis v1.1, le `tmux-start.sh` du unified-panel ne démarre plus seulement son
+propre serveur : il orchestre **toute la stack** dans une session tmux unique :
+
+| Window tmux | Process | Port | Visibilité |
+|---|---|---|---|
+| `tt-panel`   | `tiktok-panel/server.js` | 3010 | localhost-only (interne) |
+| `tt-worker`  | `tiktok-panel/worker.js` (Puppeteer Chrome) | — | — |
+| `yt-panel`   | `youtube-panel/server.js` | 3000 | localhost-only (interne) |
+| `yt-worker`  | `youtube-panel/worker.js` (ADB Android) | — | — |
+| `unified`    | `unified-panel/server.js` | 3020 | **POINT D'ENTRÉE** (Tailscale/LAN) |
+
+Le user n'a qu'une seule commande à connaître : `./tmux-start.sh` côté unified.
+Les 2 panels TikTok/YouTube restent **100 % inchangés** côté code — leurs
+projets séparés continuent à fonctionner. Le unified les *spawne* depuis sa
+propre session.
+
+**Hygiène** : si tu avais auparavant des sessions tmux séparées pour les 2
+panels (`tp-*`, `yp-*`), le `tmux-start.sh` du unified refuse de démarrer tant
+qu'elles sont actives — pour éviter les collisions de port. Arrête-les
+manuellement avant : `tmux kill-session -t tp-tiktok-panel` etc.
+
+**Variables d'env utiles** (cf. `.env.example`) :
+- `TT_PATH` / `YT_PATH` : chemins vers les 2 projets (défaut : `../tiktok-panel`, `../youtube-panel`)
+- `TT_PORT` / `YT_PORT` : ports internes (3010 / 3000)
+- `PORT` : port public du unified (3020)
+- `SPEED_FACTOR` / `MAX_PARALLEL` : forwardés aux 2 workers
+
+## Déploiement Mac mini (prod)
 
 ```bash
 # Depuis la machine de dev
 rsync -av --exclude=node_modules --exclude=data unified-panel/ macmini:~/panel/unified-panel/
 
-# Sur le Mac mini (via SSH ou local)
-cd ~/panel/unified-panel
-npm install
-./tmux-start.sh
+# Sur le Mac mini : arrête les sessions héritées si présentes
+ssh macmini "tmux kill-session -t tp-tiktok-panel 2>/dev/null; tmux kill-session -t yp-youtube-panel 2>/dev/null"
+
+# Puis lance la stack complète depuis le unified
+ssh macmini "cd ~/panel/unified-panel && ./tmux-start.sh"
 
 # Accès via Tailscale
 open http://<macmini-tailscale-ip>:3020/
