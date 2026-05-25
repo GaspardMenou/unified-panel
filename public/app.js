@@ -708,7 +708,15 @@ function renderDrawerBody(c, platform) {
   // est à jour grâce au polling). Si vide, on demandera au user d'aller
   // créer des comptes sur l'UI native.
   const availableAccounts = state.accounts.filter(a => a.platform === platform);
-  const assignedCount = campaignAccountIds.length;
+  const availableIds = new Set(availableAccounts.map(a => a.id));
+
+  // Sépare les accountIds valides (chaînes encore existantes) des orphelins
+  // (références vers des comptes supprimés dans la table accounts). Cas
+  // fréquent quand on supprime/recrée des chaînes sans toucher aux campagnes.
+  const activeAssigned  = campaignAccountIds.filter(id =>  availableIds.has(id));
+  const orphanAssigned  = campaignAccountIds.filter(id => !availableIds.has(id));
+  const assignedCount   = activeAssigned.length;
+  const orphanCount     = orphanAssigned.length;
 
   // Status switcher — TikTok + YouTube partagent les mêmes statuts principaux.
   // La valeur reste technique en anglais (cohérent avec backend) mais on
@@ -742,18 +750,46 @@ function renderDrawerBody(c, platform) {
     </section>
 
     <section>
+      <header class="card-head" style="padding:0; margin-bottom:8px"><h2>Paramètres</h2></header>
+      <div class="settings-grid">
+        <label class="field">
+          <span class="field-label">Posts par jour (total)</span>
+          <input type="number" id="drawer-ppd" min="0" step="1" value="${c.postsPerDay ?? 0}" />
+        </label>
+        ${c.maxPerAccount != null ? `
+        <label class="field">
+          <span class="field-label">Max par compte</span>
+          <input type="number" id="drawer-mpa" min="0" step="1" value="${c.maxPerAccount ?? ''}" />
+        </label>` : ''}
+      </div>
+      <div class="drawer-actions" style="margin-top:10px">
+        <span class="muted" id="drawer-settings-status" style="margin-right:auto; align-self:center; font-size:12px"></span>
+        <button type="button" id="drawer-settings-save" disabled>Enregistrer les paramètres</button>
+      </div>
+    </section>
+
+    <section>
       <header class="card-head" style="padding:0; margin-bottom:8px"><h2>Actions</h2></header>
       <div class="drawer-actions">
         <button type="button" id="drawer-pushall" class="btn-ghost">Publier la file d'attente</button>
         <button type="button" id="drawer-retry"   class="btn-ghost">Réessayer les erreurs</button>
+        <button type="button" id="drawer-schedule" class="btn-ghost" title="Recalcule le planning à partir des paramètres courants. Indispensable après une modif de Posts/jour ou de comptes assignés.">Regénérer le planning</button>
         <button type="button" id="drawer-open-native">Ouvrir le panel ↗</button>
       </div>
     </section>
 
     <section>
       <header class="card-head" style="padding:0; margin-bottom:8px">
-        <h2>Comptes assignés <span class="muted">${assignedCount} sur ${availableAccounts.length}</span></h2>
+        <h2>Comptes assignés
+          <span class="muted">${assignedCount} sur ${availableAccounts.length}</span>
+          ${orphanCount > 0 ? `<span class="tone-warn" style="font-size:11px; margin-left:8px">⚠ ${orphanCount} orphelin${orphanCount > 1 ? 's' : ''}</span>` : ''}
+        </h2>
       </header>
+      ${orphanCount > 0 ? `
+        <div class="hint" style="margin-bottom:10px">
+          ${orphanCount} référence${orphanCount > 1 ? 's' : ''} vers des chaînes supprimées. Coche les chaînes que tu veux assigner puis enregistre — les orphelins seront automatiquement filtrés.
+        </div>
+      ` : ''}
       ${availableAccounts.length === 0 ? `
         <div class="empty-state" style="padding:14px">
           <div class="empty-hint">Aucun compte ${PLATFORM_LABELS[platform]} enregistré.
@@ -853,12 +889,72 @@ function renderDrawerBody(c, platform) {
     window.open(`${url}/#/campaigns`, '_blank');
   });
 
+  // Regénérer planning — indispensable après une modif de paramètres ou de
+  // comptes. Le backend yt-panel/tt-panel purge les pending existants et
+  // recrée selon (postsPerDay × nbDays) distribué sur les accountIds.
+  $('#drawer-schedule')?.addEventListener('click', async () => {
+    if (!confirm('Régénérer le planning ? Les posts pending seront remplacés (les "done" restent).')) return;
+    await tryApi(`/api/${platform}/campaigns/${c.id}/schedule`,
+      { method: 'POST', body: {} },
+      { okMsg: 'Planning régénéré', errTitle: 'Échec de la régénération du planning' });
+    setTimeout(() => openDrawer(c.id, platform), 800);
+  });
+
+  // ─── Paramètres : postsPerDay (et maxPerAccount si défini) ──────────────
+  const ppdInput = $('#drawer-ppd');
+  const mpaInput = $('#drawer-mpa');
+  const settingsSave = $('#drawer-settings-save');
+  const settingsStatus = $('#drawer-settings-status');
+  if (ppdInput && settingsSave) {
+    const origPpd = Number(c.postsPerDay ?? 0);
+    const origMpa = c.maxPerAccount != null ? Number(c.maxPerAccount) : null;
+
+    const updateSettingsState = () => {
+      const ppdVal = Number(ppdInput.value);
+      const mpaVal = mpaInput ? Number(mpaInput.value) : origMpa;
+      const dirty = ppdVal !== origPpd || (mpaInput && mpaVal !== origMpa);
+      const invalid = ppdInput.value === '' || Number.isNaN(ppdVal) || ppdVal < 0;
+      settingsSave.disabled = !dirty || invalid;
+      if (invalid) {
+        settingsStatus.textContent = '⚠ Valeur invalide';
+        settingsStatus.style.color = 'var(--bad)';
+      } else if (dirty) {
+        settingsStatus.textContent = 'Pense à régénérer le planning après';
+        settingsStatus.style.color = 'var(--text-2)';
+      } else {
+        settingsStatus.textContent = '';
+      }
+    };
+    ppdInput.addEventListener('input', updateSettingsState);
+    mpaInput?.addEventListener('input', updateSettingsState);
+
+    settingsSave.addEventListener('click', async () => {
+      const body = { postsPerDay: Number(ppdInput.value) };
+      if (mpaInput && mpaInput.value !== '') body.maxPerAccount = Number(mpaInput.value);
+      settingsSave.disabled = true;
+      settingsSave.textContent = 'Enregistrement…';
+      try {
+        await tryApi(`/api/${platform}/campaigns/${c.id}`,
+          { method: 'PATCH', body },
+          { okMsg: `Paramètres mis à jour — pense à régénérer le planning`, errTitle: 'Échec de la mise à jour' });
+        refreshAll();
+        openDrawer(c.id, platform);
+      } catch {
+        settingsSave.disabled = false;
+        settingsSave.textContent = 'Enregistrer les paramètres';
+      }
+    });
+  }
+
   // ─── Comptes assignés — édition multi-select avec save explicite ────────
   const picker = $('#drawer-accounts');
   const saveBtn = $('#drawer-accounts-save');
   const statusEl = $('#drawer-accounts-status');
   if (picker && saveBtn) {
-    const currentSet = new Set(campaignAccountIds);
+    // Référence pour la diff : seulement les IDs valides (chaînes encore
+    // existantes). Les orphelins ne sont pas pris en compte — ils seront
+    // automatiquement supprimés au save puisqu'ils ne peuvent pas être cochés.
+    const currentSet = new Set(activeAssigned);
 
     const getSelectedIds = () => Array.from(picker.querySelectorAll('input[type="checkbox"]:checked'))
       .map(cb => cb.dataset.accountId);
