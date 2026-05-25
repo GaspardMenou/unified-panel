@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unified Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Aller au contenu</a>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><span class="brand-dot"></span></span>
+        <div class="brand-text">
+          <span class="brand-name">Unified</span>
+          <span class="brand-sub">Panel</span>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Sections">
+        <a class="nav-item nav-active" href="#/" data-route="overview">
+          <span class="nav-glyph">◐</span><span>Vue d'ensemble</span>
+        </a>
+        <a class="nav-item" href="#/campaigns" data-route="campaigns">
+          <span class="nav-glyph">◓</span><span>Campagnes</span>
+        </a>
+        <a class="nav-item" href="#/accounts" data-route="accounts">
+          <span class="nav-glyph">◑</span><span>Comptes</span>
+        </a>
+        <a class="nav-item" href="#/activity" data-route="activity">
+          <span class="nav-glyph">◔</span><span>Activité</span>
+        </a>
+        <a class="nav-item" href="#/stats" data-route="stats">
+          <span class="nav-glyph">◕</span><span>Statistiques</span>
+        </a>
+        <div class="nav-divider" role="separator" aria-orientation="horizontal"></div>
+        <span class="nav-section-label">Outils natifs</span>
+        <a class="nav-item nav-external" id="nav-studio" href="#" target="_blank" rel="noopener" title="Pilotage live des téléphones Android · ouvre le panel YouTube">
+          <span class="nav-glyph">●</span><span>Studio Android</span><span class="nav-ext">↗</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="backend-status" id="backend-status">
+          <span class="bs-item" data-platform="tiktok"><span class="bs-dot"></span>TikTok</span>
+          <span class="bs-item" data-platform="youtube"><span class="bs-dot"></span>YouTube</span>
+        </div>
+        <span class="sidebar-meta" id="page-date"></span>
+      </div>
+    </aside>
+
+    <main class="main" id="main-content" tabindex="-1">
+      <!-- OVERVIEW -->
+      <section class="route route-active" data-route="overview">
+        <header class="page-head">
+          <div class="page-head-left">
+            <span class="eyebrow">Tableau de bord</span>
+            <h1 class="page-title">Vue d'ensemble <span class="page-title-soft">TikTok &amp; YouTube</span></h1>
+          </div>
+          <div class="page-head-right">
+            <div class="platform-toggle" id="platform-toggle" role="radiogroup" aria-label="Filtrer par plateforme">
+              <button type="button" role="radio" aria-checked="true"  data-platform="all"     class="active">Tous</button>
+              <button type="button" role="radio" aria-checked="false" data-platform="tiktok">TikTok</button>
+              <button type="button" role="radio" aria-checked="false" data-platform="youtube">YouTube</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="stats">
+          <div class="stat stat-feature">
+            <span class="stat-label">Publiés</span>
+            <span class="stat-value tone-good" id="s-done">—</span>
+            <span class="stat-foot" id="s-done-foot">total cumulé</span>
+          </div>
+          <div class="stat"><span class="stat-label">Taux de succès</span><span class="stat-value" id="s-success">—</span></div>
+          <div class="stat"><span class="stat-label">Campagnes</span><span class="stat-value" id="s-campaigns">—</span></div>
+          <div class="stat"><span class="stat-label">Comptes</span><span class="stat-value" id="s-accounts">—</span></div>
+          <div class="stat"><span class="stat-label">En file</span><span class="stat-value" id="s-pending">—</span></div>
+          <div class="stat"><span class="stat-label">En cours d'envoi</span><span class="stat-value tone-warn" id="s-queued">—</span></div>
+          <div class="stat"><span class="stat-label">Échecs</span><span class="stat-value tone-bad" id="s-errors">—</span></div>
+        </section>
+
+        <div class="overview-grid">
+          <section class="card">
+            <header class="card-head">
+              <div><span class="eyebrow">Comparatif</span><h2>Répartition par plateforme</h2></div>
+            </header>
+            <div id="overview-split" class="chart-host"></div>
+          </section>
+          <section class="card logs-card logs-card-compact">
+            <header class="card-head">
+              <div><span class="eyebrow">Récent</span><h2>Activité <span class="live">live</span></h2></div>
+              <a class="btn-ghost" href="#/activity">Voir tout →</a>
+            </header>
+            <ul id="logs-overview" class="logs"></ul>
+          </section>
+        </div>
+      </section>
+
+      <!-- CAMPAIGNS -->
+      <section class="route" data-route="campaigns">
+        <header class="page-head">
+          <div class="page-head-left">
+            <span class="eyebrow">Toutes plateformes</span>
+            <h1 class="page-title">Campagnes</h1>
+          </div>
+          <div class="page-head-right">
+            <div class="platform-toggle" data-toggle-mirror role="radiogroup" aria-label="Plateforme"></div>
+          </div>
+        </header>
+
+        <section class="card">
+          <header class="card-head">
+            <div><span class="eyebrow">Liste</span><h2>Campagnes <span class="muted" id="camp-count"></span></h2></div>
+            <div class="row row-tight">
+              <div class="seg" id="camp-status-filter" role="radiogroup" aria-label="Statut">
+                <button type="button" class="seg-btn seg-active" data-camp-filter="all">Toutes</button>
+                <button type="button" class="seg-btn" data-camp-filter="running">En cours</button>
+                <button type="button" class="seg-btn" data-camp-filter="scheduled">Planifiées</button>
+                <button type="button" class="seg-btn" data-camp-filter="draft">Brouillons</button>
+                <button type="button" class="seg-btn" data-camp-filter="done">Terminées</button>
+              </div>
+            </div>
+          </header>
+          <ul id="campaigns-list" class="campaigns list-unified"></ul>
+          <p class="hint">La création de campagne (avec upload des clips) se fait sur le panel de chaque plateforme. Les nouvelles campagnes apparaissent ici dans les 15 secondes.</p>
+        </section>
+      </section>
+
+      <!-- ACCOUNTS -->
+      <section class="route" data-route="accounts">
+        <header class="page-head">
+          <div class="page-head-left">
+            <span class="eyebrow">Toutes plateformes</span>
+            <h1 class="page-title">Comptes</h1>
+          </div>
+          <div class="page-head-right">
+            <div class="platform-toggle" data-toggle-mirror role="radiogroup" aria-label="Plateforme"></div>
+          </div>
+        </header>
+
+        <section class="card">
+          <header class="card-head">
+            <div><span class="eyebrow">Liste</span><h2>Comptes / chaînes <span class="muted" id="acc-count"></span></h2></div>
+            <div class="row row-tight">
+              <div class="seg" id="acc-state-filter" role="radiogroup" aria-label="État">
+                <button type="button" class="seg-btn seg-active" data-acc-filter="all">Tous</button>
+                <button type="button" class="seg-btn" data-acc-filter="cooldown">En cooldown</button>
+                <button type="button" class="seg-btn" data-acc-filter="needs-login">Login requis</button>
+              </div>
+            </div>
+          </header>
+          <ul id="accounts-list" class="list list-unified"></ul>
+        </section>
+      </section>
+
+      <!-- ACTIVITY -->
+      <section class="route" data-route="activity">
+        <header class="page-head">
+          <div class="page-head-left">
+            <span class="eyebrow">Journal</span>
+            <h1 class="page-title">Activité <span class="page-title-soft">en direct</span></h1>
+          </div>
+          <div class="page-head-right">
+            <div class="platform-toggle" data-toggle-mirror role="radiogroup" aria-label="Plateforme"></div>
+          </div>
+        </header>
+
+        <section class="card logs-card logs-card-full">
+          <header class="card-head">
+            <div><span class="eyebrow">Logs</span><h2>Événements <span class="live">live</span></h2></div>
+            <div class="row row-tight">
+              <div class="seg" id="log-type-filter" role="radiogroup" aria-label="Type">
+                <button type="button" class="seg-btn seg-active" data-log-filter="all">Tous</button>
+                <button type="button" class="seg-btn" data-log-filter="info">Info</button>
+                <button type="button" class="seg-btn" data-log-filter="success">Succès</button>
+                <button type="button" class="seg-btn" data-log-filter="error">Erreurs</button>
+              </div>
+              <label for="logs-search" class="sr-only">Rechercher dans les logs</label>
+              <input id="logs-search" class="input-inline" type="search" placeholder="Recherche…" aria-label="Rechercher dans les logs" />
+            </div>
+          </header>
+          <ul id="logs" class="logs"></ul>
+        </section>
+      </section>
+
+      <!-- STATS -->
+      <section class="route" data-route="stats">
+        <header class="page-head">
+          <div class="page-head-left">
+            <span class="eyebrow">Analytique</span>
+            <h1 class="page-title">Statistiques</h1>
+          </div>
+          <div class="page-head-right">
+            <div class="platform-toggle" data-toggle-mirror role="radiogroup" aria-label="Plateforme"></div>
+            <button type="button" class="btn-ghost" id="stats-refresh">↻ Rafraîchir</button>
+          </div>
+        </header>
+
+        <section class="stats" id="stats-kpi"></section>
+
+        <div class="charts-grid">
+          <section class="card chart-card chart-wide">
+            <header class="card-head">
+              <div><span class="eyebrow">30 jours</span><h2>Publications dans le temps</h2></div>
+              <div class="chart-foot">
+                <span class="lg"><span class="lg-dot" style="background:var(--accent)"></span>Publié</span>
+                <span class="lg"><span class="lg-dot" style="background:var(--bad)"></span>Erreur</span>
+                <span class="lg"><span class="lg-dot" style="background:var(--text-4)"></span>Skip</span>
+              </div>
+            </header>
+            <div id="chart-daily" class="chart-host"></div>
+          </section>
+          <section class="card chart-card">
+            <header class="card-head"><div><span class="eyebrow">Répartition</span><h2>Statuts</h2></div></header>
+            <div id="chart-status" class="chart-host"></div>
+          </section>
+          <section class="card chart-card">
+            <header class="card-head"><div><span class="eyebrow">Horaire</span><h2>Distribution 0–23 h</h2></div></header>
+            <div id="chart-hourly" class="chart-host"></div>
+          </section>
+          <section class="card chart-card">
+            <header class="card-head"><div><span class="eyebrow">Top</span><h2>Comptes les plus actifs</h2></div></header>
+            <div id="chart-channels" class="chart-host"></div>
+          </section>
+          <section class="card chart-card">
+            <header class="card-head"><div><span class="eyebrow">Avancement</span><h2>Par campagne</h2></div></header>
+            <div id="chart-campaigns" class="chart-host"></div>
+          </section>
+          <section class="card chart-card">
+            <header class="card-head"><div><span class="eyebrow">Incidents</span><h2>Types d'erreurs</h2></div></header>
+            <div id="chart-errors" class="chart-host"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Drawer détail campagne -->
+  <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true" tabindex="-1">
+    <div class="drawer-head">
+      <span class="badge" id="drawer-badge" data-platform=""><span class="badge-dot" aria-hidden="true"></span><span data-role="label"></span></span>
+      <h2 id="drawer-title">Campagne</h2>
+      <button type="button" class="btn-icon" id="drawer-close" aria-label="Fermer le détail">×</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <!-- Toasts : aria-live polite pour annoncer succès/erreurs aux SR sans interrompre -->
+  <div id="toasts" class="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Banner online/offline (caché par défaut) -->
+  <div id="net-banner" class="net-banner" role="status" aria-live="polite" hidden></div>
+
+  <script src="/app.js" type="module"></script>
+  <script>
+    (() => {
+      const el = document.getElementById('page-date');
+      if (el) el.textContent = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
+    })();
+  </script>
+</body>
+</html>
