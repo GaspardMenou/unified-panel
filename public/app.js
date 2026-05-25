@@ -84,7 +84,10 @@ const state = {
   status: { tiktok: null, youtube: null },
   overview: null,
   campaigns: [],
-  campFilter: 'all',
+  // Par défaut on cache les campagnes terminées/archivées (pattern hérité du
+  // yt-panel). Filtres dispo : 'active' | 'running' | 'scheduled' | 'draft' |
+  // 'done' | 'all'.
+  campFilter: 'active',
   accounts: [],
   accFilter: 'all',
   logs: [],
@@ -274,8 +277,11 @@ function setPlatform(p) {
 // + recherche) pour mettre à jour les badges "(N)" sans toucher au DOM des listes.
 function updateFilteredCounts() {
   if (state.route === 'campaigns') {
-    const count = filterByPlatform(state.campaigns)
-      .filter(c => state.campFilter === 'all' || c.status === state.campFilter).length;
+    const count = filterByPlatform(state.campaigns).filter(c => {
+      if (state.campFilter === 'all') return true;
+      if (state.campFilter === 'active') return c.status !== 'done' && !c.archived;
+      return c.status === state.campFilter;
+    }).length;
     $('#camp-count').textContent = count ? `(${count})` : '';
   }
   if (state.route === 'accounts') {
@@ -506,7 +512,10 @@ function renderOverviewLogs() {
 
 function renderCampaigns() {
   let items = filterByPlatform(state.campaigns);
-  if (state.campFilter !== 'all') {
+  if (state.campFilter === 'active') {
+    // "Active" = tout sauf terminées/archivées. Pattern par défaut.
+    items = items.filter(c => c.status !== 'done' && !c.archived);
+  } else if (state.campFilter !== 'all') {
     items = items.filter(c => c.status === state.campFilter);
   }
   $('#camp-count').textContent = items.length ? `(${items.length})` : '';
@@ -527,8 +536,10 @@ function renderCampaigns() {
       action: `<button type="button" class="btn-ghost btn-sm" data-platform-fallback="all">Voir toutes les plateformes</button>`,
     }) : why === 'filter' ? emptyStateHtml({
       icon: '⊘',
-      title: `Aucune campagne ${escapeHtml(state.campFilter)}${platformLabel ? ` sur ${platformLabel}` : ''}`,
-      hint: 'Essaie un autre filtre ou la vue "Toutes".',
+      title: `Aucune campagne ${state.campFilter === 'active' ? 'active' : escapeHtml(state.campFilter)}${platformLabel ? ` sur ${platformLabel}` : ''}`,
+      hint: state.campFilter === 'active'
+        ? 'Toutes les campagnes sont terminées ou archivées. Bascule sur "Toutes" pour les voir.'
+        : 'Essaie un autre filtre, ou la vue "Toutes".',
       action: `<button type="button" class="btn-ghost btn-sm" data-camp-filter-reset>Voir toutes les campagnes</button>`,
     }) : emptyStateHtml({
       icon: '∅',
@@ -623,7 +634,23 @@ async function openDrawer(campaignId, platform) {
   badge.dataset.platform = platform;
   badge.querySelector('[data-role="label"]').textContent = PLATFORM_LABELS[platform];
   $('#drawer-title').textContent = camp?.name || 'Campagne';
-  $('#drawer-body').innerHTML = '<div class="muted" role="status">Chargement…</div>';
+
+  // Loading state visible : on rend déjà les stats de surface qu'on a dans
+  // la liste, et on ajoute un loader sous "Chargement du détail".
+  const surfaceStats = camp ? `
+    <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))">
+      <div class="stat"><span class="stat-label">Publiés</span><span class="stat-value tone-good">${camp.stats.done}</span></div>
+      <div class="stat"><span class="stat-label">Total</span><span class="stat-value">${camp.stats.total}</span></div>
+      <div class="stat"><span class="stat-label">Erreurs</span><span class="stat-value tone-bad">${camp.stats.errors}</span></div>
+      <div class="stat"><span class="stat-label">En attente</span><span class="stat-value">${camp.stats.pending}</span></div>
+    </div>
+  ` : '';
+  $('#drawer-body').innerHTML = `
+    ${surfaceStats}
+    <div class="drawer-loading" role="status" aria-live="polite">
+      <span class="drawer-loading-spinner" aria-hidden="true"></span>
+      <span>Chargement du détail…</span>
+    </div>`;
 
   // Focus le bouton de fermeture en premier (point d'entrée prévisible)
   // — défer pour laisser le navigateur appliquer la transition CSS.
@@ -636,7 +663,16 @@ async function openDrawer(campaignId, platform) {
     renderDrawerBody(detail, platform);
   } catch (e) {
     if (state.drawerCampaign?.id !== campaignId) return;
-    $('#drawer-body').innerHTML = `<div class="empty-state empty-state-warn" role="alert"><span class="empty-icon" aria-hidden="true">⚠</span>${escapeHtml(e.message)}</div>`;
+    $('#drawer-body').innerHTML = `
+      <div class="empty-state empty-state-warn" role="alert">
+        <span class="empty-icon" aria-hidden="true">⚠</span>
+        <div class="empty-title">Détail indisponible</div>
+        <div class="empty-hint">${escapeHtml(e.message)}</div>
+        <div class="empty-action">
+          <button type="button" class="btn-ghost btn-sm" data-drawer-retry>Réessayer</button>
+        </div>
+      </div>`;
+    $('#drawer-body').querySelector('[data-drawer-retry]')?.addEventListener('click', () => openDrawer(campaignId, platform));
   }
 }
 

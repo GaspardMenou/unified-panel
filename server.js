@@ -226,9 +226,13 @@ app.all('/api/:platform/*', async (req, res) => {
     });
   }
 
+  // Timeout étendu pour les endpoints lourds : un détail de campagne avec
+  // beaucoup de schedule posts peut prendre quelques secondes côté backend.
+  const isHeavy = /\/campaigns\/[^/]+($|\?)/.test(targetPath) && method === 'GET';
   const result = await fetchPlatform(platform, targetPath, {
     method,
     body: ['POST', 'PATCH', 'PUT'].includes(method) ? req.body : undefined,
+    timeoutMs: isHeavy ? 20000 : undefined,
   });
 
   if (!result.ok) {
