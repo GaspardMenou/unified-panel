@@ -702,6 +702,13 @@ function renderDrawerBody(c, platform) {
   const done = stats.done || 0;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   const clips = c.clips || [];
+  const campaignAccountIds = Array.isArray(c.accountIds) ? c.accountIds : [];
+
+  // Comptes disponibles sur cette plateforme (depuis state.accounts qui
+  // est à jour grâce au polling). Si vide, on demandera au user d'aller
+  // créer des comptes sur l'UI native.
+  const availableAccounts = state.accounts.filter(a => a.platform === platform);
+  const assignedCount = campaignAccountIds.length;
 
   // Status switcher — TikTok + YouTube partagent les mêmes statuts principaux.
   // La valeur reste technique en anglais (cohérent avec backend) mais on
@@ -741,6 +748,39 @@ function renderDrawerBody(c, platform) {
         <button type="button" id="drawer-retry"   class="btn-ghost">Réessayer les erreurs</button>
         <button type="button" id="drawer-open-native">Ouvrir le panel ↗</button>
       </div>
+    </section>
+
+    <section>
+      <header class="card-head" style="padding:0; margin-bottom:8px">
+        <h2>Comptes assignés <span class="muted">${assignedCount} sur ${availableAccounts.length}</span></h2>
+      </header>
+      ${availableAccounts.length === 0 ? `
+        <div class="empty-state" style="padding:14px">
+          <div class="empty-hint">Aucun compte ${PLATFORM_LABELS[platform]} enregistré.
+            Crée d'abord tes comptes dans l'UI native pour pouvoir les assigner.</div>
+        </div>
+      ` : `
+        <div class="account-picker" id="drawer-accounts">
+          ${availableAccounts.map(a => {
+            const checked = campaignAccountIds.includes(a.id);
+            const tags = [];
+            if (a.cooldownActive) tags.push('<span class="tone-warn">cooldown</span>');
+            if (a.needsLogin)     tags.push('<span class="tone-bad">login</span>');
+            return `
+              <label class="account-row ${checked ? 'is-checked' : ''}">
+                <input type="checkbox" data-account-id="${escapeHtml(a.id)}" ${checked ? 'checked' : ''} />
+                <span class="account-name">${escapeHtml(a.label)}</span>
+                ${tags.length ? `<span class="account-tags">${tags.join(' ')}</span>` : ''}
+              </label>`;
+          }).join('')}
+        </div>
+        <div class="drawer-actions" style="margin-top:10px">
+          <button type="button" id="drawer-accounts-all"   class="btn-ghost btn-sm">Tout cocher</button>
+          <button type="button" id="drawer-accounts-none"  class="btn-ghost btn-sm">Tout décocher</button>
+          <span class="muted" id="drawer-accounts-status" style="margin-left:auto; align-self:center; font-size:12px"></span>
+          <button type="button" id="drawer-accounts-save"  disabled>Enregistrer</button>
+        </div>
+      `}
     </section>
 
     ${upcoming.length ? `
@@ -812,6 +852,70 @@ function renderDrawerBody(c, platform) {
       'Le statut du backend n\'a pas encore été récupéré.');
     window.open(`${url}/#/campaigns`, '_blank');
   });
+
+  // ─── Comptes assignés — édition multi-select avec save explicite ────────
+  const picker = $('#drawer-accounts');
+  const saveBtn = $('#drawer-accounts-save');
+  const statusEl = $('#drawer-accounts-status');
+  if (picker && saveBtn) {
+    const currentSet = new Set(campaignAccountIds);
+
+    const getSelectedIds = () => Array.from(picker.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(cb => cb.dataset.accountId);
+
+    const setsEqual = (a, b) => a.size === b.size && [...a].every(x => b.has(x));
+
+    const updateSaveState = () => {
+      const selected = new Set(getSelectedIds());
+      const dirty = !setsEqual(selected, currentSet);
+      saveBtn.disabled = !dirty || selected.size === 0;
+      if (selected.size === 0) {
+        statusEl.textContent = '⚠ Au moins 1 compte requis';
+        statusEl.style.color = 'var(--bad)';
+      } else if (dirty) {
+        const delta = selected.size - currentSet.size;
+        statusEl.textContent = delta > 0 ? `+${delta} ajout${delta > 1 ? 's' : ''}`
+                              : delta < 0 ? `${delta} retrait${delta < -1 ? 's' : ''}`
+                              : 'modifié';
+        statusEl.style.color = 'var(--text-2)';
+      } else {
+        statusEl.textContent = '';
+      }
+      // Reflète l'état coché visuellement (classe is-checked pour le style)
+      picker.querySelectorAll('label.account-row').forEach(row => {
+        const cb = row.querySelector('input[type="checkbox"]');
+        row.classList.toggle('is-checked', cb.checked);
+      });
+    };
+
+    picker.addEventListener('change', updateSaveState);
+
+    $('#drawer-accounts-all')?.addEventListener('click', () => {
+      picker.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+      updateSaveState();
+    });
+    $('#drawer-accounts-none')?.addEventListener('click', () => {
+      picker.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+      updateSaveState();
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      const accountIds = getSelectedIds();
+      if (accountIds.length === 0) return; // garde-fou
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Enregistrement…';
+      try {
+        await tryApi(`/api/${platform}/campaigns/${c.id}`,
+          { method: 'PATCH', body: { accountIds } },
+          { okMsg: `${accountIds.length} compte(s) assigné(s) à la campagne`, errTitle: 'Échec de la mise à jour' });
+        refreshAll();
+        openDrawer(c.id, platform); // refresh drawer pour récupérer schedule à jour
+      } catch {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Enregistrer';
+      }
+    });
+  }
 }
 
 // ─── Page COMPTES ───────────────────────────────────────────────────────────
